@@ -51,7 +51,7 @@ function emit(x, y, hue) {
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 0.15, // léger flottement vers le haut
       life: 1,
-      decay: 0.012 + Math.random() * 0.01,
+      decay: 0.024 + Math.random() * 0.02,
       radius: 26 + Math.random() * 34,
       hue: hue + (Math.random() * 30 - 15),
     });
@@ -84,7 +84,7 @@ function spawn(x, y, id) {
 function frame() {
   // Estompage progressif du fond -> laisse une traînée qui s'efface en douceur
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = 'rgba(5, 5, 16, 0.16)';
+  ctx.fillStyle = 'rgba(5, 5, 16, 0.32)';
   ctx.fillRect(0, 0, width, height);
 
   // Les glows s'additionnent -> couleurs lumineuses et éclatantes

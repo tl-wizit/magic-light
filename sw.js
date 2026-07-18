@@ -1,6 +1,6 @@
 // Service worker minimal : met l'app en cache pour un usage hors-ligne.
 // Pense à changer le numéro de version quand tu modifies les fichiers.
-const CACHE = 'lumiere-v1';
+const CACHE = 'lumiere-v2';
 const ASSETS = [
   './',
   './index.html',
