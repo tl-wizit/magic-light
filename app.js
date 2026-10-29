@@ -168,7 +168,7 @@ function frame() {
 
   // Bulles qui montent ; un doigt dessus les fait éclater
   const nowMs = performance.now();
-  if (nowMs - lastBubbleAt > 1600) {
+  if (nowMs - lastBubbleAt > 800) {
     lastBubbleAt = nowMs;
     spawnBubble();
   }
