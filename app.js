@@ -233,15 +233,21 @@ function playBlip(y) {
   osc.stop(now + 0.45);
 }
 
-// Accord : plusieurs notes jouées ensemble quand plusieurs doigts touchent
+// Accord : plusieurs notes empilées quand plusieurs doigts touchent l'écran.
+// Chaque doigt ajoute une note différente, même s'ils sont à la même hauteur
+// (ex. trois doigts en ligne) -> on entend bien un accord.
 function playChord(ys) {
-  if (!audioCtx) return;
+  if (!audioCtx || !ys.length) return;
   const now = audioCtx.currentTime;
   const scale = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5];
-  const level = 0.12 / Math.max(1, Math.sqrt(ys.length)); // évite la saturation
-  ys.forEach((y, i) => {
-    const t = 1 - Math.min(Math.max(y / height, 0), 1);
-    const note = scale[Math.round(t * (scale.length - 1))];
+  const avgY = ys.reduce((a, b) => a + b, 0) / ys.length;
+  const t = 1 - Math.min(Math.max(avgY / height, 0), 1); // haut = plus aigu
+  const base = Math.round(t * (scale.length - 1));
+  const n = ys.length;
+  const level = 0.12 / Math.max(1, Math.sqrt(n)); // évite la saturation
+  for (let i = 0; i < n; i++) {
+    const idx = base + i * 2; // empile des tierces -> accord ouvert et joyeux
+    const note = scale[idx % scale.length] * Math.pow(2, Math.floor(idx / scale.length));
     const start = now + i * 0.015; // petit décalage -> l'accord éclôt en douceur
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -253,7 +259,7 @@ function playChord(ys) {
     osc.connect(gain).connect(audioCtx.destination);
     osc.start(start);
     osc.stop(start + 0.65);
-  });
+  }
 }
 
 // Petit "pop" joyeux quand une bulle éclate
@@ -326,7 +332,7 @@ function scheduleChord() {
       if (f.lastY != null) ys.push(f.lastY);
     }
     if (ys.length) playChord(ys);
-  }, 45);
+  }, 70); // fenêtre pour regrouper les doigts posés presque ensemble
 }
 
 function onDown(e) {
