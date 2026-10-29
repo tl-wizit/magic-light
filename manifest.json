@@ -1,6 +1,6 @@
 {
-  "name": "Lumière magique",
-  "short_name": "Lumière",
+  "name": "Magic Light",
+  "short_name": "Magic Light",
   "description": "Un jeu de lumières colorées à toucher, pour les tout-petits.",
   "start_url": "./",
   "scope": "./",

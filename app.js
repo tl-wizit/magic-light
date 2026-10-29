@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Lumière magique — un glow coloré qui suit le doigt, avec une traînée joyeuse
+// Magic Light — un glow coloré qui suit le doigt, avec une traînée joyeuse
 // et un petit son doux. Pensé pour un tout-petit : plein écran, multi-doigts.
 // ---------------------------------------------------------------------------
 
@@ -79,6 +79,59 @@ function spawn(x, y, id) {
   finger.lastY = y;
 }
 
+// --- Bulles à faire éclater ---------------------------------------------------
+
+const bubbles = [];
+const MAX_BUBBLES = 6;
+let lastBubbleAt = 0;
+
+function spawnBubble() {
+  if (bubbles.length >= MAX_BUBBLES) return;
+  bubbles.push({
+    x: 50 + Math.random() * (width - 100),
+    y: height + 50,
+    vy: -(0.3 + Math.random() * 0.45), // monte doucement
+    radius: 34 + Math.random() * 26,
+    hue: Math.floor(Math.random() * 360),
+    phase: Math.random() * Math.PI * 2, // pour le balancement latéral
+  });
+}
+
+// Explosion de particules quand une bulle éclate
+function burst(x, y, hue) {
+  for (let i = 0; i < 26; i++) {
+    if (particles.length >= MAX_PARTICLES) particles.shift();
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1.5 + Math.random() * 2.6;
+    particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1,
+      decay: 0.018 + Math.random() * 0.02,
+      radius: 14 + Math.random() * 18,
+      hue: hue + (Math.random() * 40 - 20),
+    });
+  }
+}
+
+// Cherche une bulle sous le doigt ; si trouvée, l'éclate (son + vibration)
+function popBubbleAt(x, y) {
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b = bubbles[i];
+    const cx = b.drawX != null ? b.drawX : b.x;
+    if (Math.hypot(x - cx, y - b.y) <= b.radius * 1.15) {
+      bubbles.splice(i, 1);
+      burst(cx, b.y, b.hue);
+      playPop(b.hue);
+      buzz(30);
+      return true;
+    }
+  }
+  return false;
+}
+
 // --- Boucle de rendu ----------------------------------------------------------
 
 function frame() {
@@ -110,6 +163,32 @@ function frame() {
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Bulles qui montent ; un doigt dessus les fait éclater
+  const nowMs = performance.now();
+  if (nowMs - lastBubbleAt > 1600) {
+    lastBubbleAt = nowMs;
+    spawnBubble();
+  }
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b = bubbles[i];
+    b.phase += 0.02;
+    b.y += b.vy;
+    const bx = b.x + Math.sin(b.phase) * 12; // léger balancement
+    b.drawX = bx;
+    if (b.y < -60) {
+      bubbles.splice(i, 1);
+      continue;
+    }
+    const grad = ctx.createRadialGradient(bx, b.y, 0, bx, b.y, b.radius);
+    grad.addColorStop(0, `hsla(${b.hue}, 100%, 75%, 0.5)`);
+    grad.addColorStop(0.7, `hsla(${b.hue}, 100%, 60%, 0.22)`);
+    grad.addColorStop(1, `hsla(${b.hue}, 100%, 55%, 0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(bx, b.y, b.radius, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -154,6 +233,47 @@ function playBlip(y) {
   osc.stop(now + 0.45);
 }
 
+// Accord : plusieurs notes jouées ensemble quand plusieurs doigts touchent
+function playChord(ys) {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const scale = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5];
+  const level = 0.12 / Math.max(1, Math.sqrt(ys.length)); // évite la saturation
+  ys.forEach((y, i) => {
+    const t = 1 - Math.min(Math.max(y / height, 0), 1);
+    const note = scale[Math.round(t * (scale.length - 1))];
+    const start = now + i * 0.015; // petit décalage -> l'accord éclôt en douceur
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = note;
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(level, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.6);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(start);
+    osc.stop(start + 0.65);
+  });
+}
+
+// Petit "pop" joyeux quand une bulle éclate
+function playPop(hue) {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const base = 440 + (hue / 360) * 440; // la couleur choisit la hauteur
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(base, now);
+  osc.frequency.exponentialRampToValueAtTime(base * 2, now + 0.12); // saut vers l'aigu
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.16, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + 0.3);
+}
+
 // --- Entrées tactiles (pointer events = souris + tactile + stylet) ------------
 
 let hintHidden = false;
@@ -163,17 +283,68 @@ function hideHint() {
   hint.classList.add('hidden');
 }
 
+// Petite vibration au toucher (Android ; l'iPhone n'a pas cette API)
+function buzz(ms) {
+  if (navigator.vibrate) {
+    try { navigator.vibrate(ms); } catch (_) {}
+  }
+}
+
+// Garde l'écran allumé pendant le jeu
+let wakeLock = null;
+async function keepAwake() {
+  try {
+    if ('wakeLock' in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    }
+  } catch (_) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') keepAwake();
+});
+
+// Passe en plein écran au premier contact (cache les barres sur Android)
+let triedFullscreen = false;
+function goFullscreen() {
+  if (triedFullscreen) return;
+  triedFullscreen = true;
+  const el = document.documentElement;
+  if (!document.fullscreenElement && el.requestFullscreen) {
+    el.requestFullscreen().catch(() => {});
+  }
+}
+
+// Accord groupé : rassemble tous les doigts posés presque en même temps
+let chordTimer = null;
+function scheduleChord() {
+  if (chordTimer) return;
+  chordTimer = setTimeout(() => {
+    chordTimer = null;
+    const ys = [];
+    for (const f of fingers.values()) {
+      if (f.lastY != null) ys.push(f.lastY);
+    }
+    if (ys.length) playChord(ys);
+  }, 45);
+}
+
 function onDown(e) {
   ensureAudio();
+  keepAwake();
+  goFullscreen();
   hideHint();
+  buzz(12);
+  const popped = popBubbleAt(e.clientX, e.clientY);
   spawn(e.clientX, e.clientY, e.pointerId);
-  playBlip(e.clientY);
+  if (!popped) scheduleChord(); // sinon le "pop" de la bulle suffit
 }
 
 function onMove(e) {
   // getCoalescedEvents -> traînée fluide même si le doigt bouge vite
   const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
   for (const ev of events) {
+    popBubbleAt(ev.clientX, ev.clientY); // un doigt qui glisse éclate les bulles
     spawn(ev.clientX, ev.clientY, e.pointerId);
   }
   playBlip(e.clientY);

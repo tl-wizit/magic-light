@@ -1,4 +1,4 @@
-# Lumière magique ✨
+# Magic Light ✨
 
 Une petite application web (PWA) toute simple pour un tout-petit : on touche
 l'écran et une lumière colorée s'allume ; on glisse le doigt et une traînée
